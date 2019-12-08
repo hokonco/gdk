@@ -1,2 +1,2 @@
-# godevkit
+# gdk
 Golang Development Kit
