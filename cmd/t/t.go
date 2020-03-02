@@ -26,10 +26,38 @@ func main() {
 	)
 	fmt.Println(">>>", v, err)
 
-	err = client.SQL{
+	sql := client.SQL{
 		DriverName: "postgres",
-		DSN:        "",
-	}.New().Do(ctx, nil)
+		DSN:        "host=0.0.0.0 port=5432 user=postgres password=password sslmode=disable",
+	}.New()
+
+	c, err := sql.Conn(ctx)
+	if err != nil {
+		panic(err)
+	}
+	err = sql.Do(ctx, func() error {
+		// row := c.QueryRowContext(ctx, "")
+		// err := row.Scan()
+		// if err != nil {
+		// 	return err
+		// }
+		rows, err := c.QueryContext(ctx, "")
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			err = rows.Err()
+			if err != nil {
+				return err
+			}
+			err = rows.Scan()
+			if err != nil {
+				return err
+			}
+		}
+		fmt.Println(">>>", err)
+		return err
+	})
 	fmt.Println(">>>", err)
 
 	if true {

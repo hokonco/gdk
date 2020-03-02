@@ -3,15 +3,18 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/hokonco/gdk/errors"
 	"github.com/hokonco/gdk/pool"
+	"github.com/hokonco/gdk/timeout"
 )
 
 // Instance ...
 type Instance interface {
 	Close() error
-	Do(context.Context, func(*sql.Conn) error) error
+	Conn(context.Context) (*sql.Conn, error)
+	Do(context.Context, func() error) error
 	Stats() sql.DBStats
 }
 type impl struct {
@@ -44,19 +47,26 @@ func (x *impl) Close() error {
 	return x.DB.Close()
 }
 
-func (x *impl) Do(ctx context.Context, fn func(*sql.Conn) error) error {
-	if fn == nil {
-		return errors.New("")
-	}
-	conn, err := x.DB.Conn(ctx)
-	if err != nil {
-		return err
-	}
+func (x *impl) Conn(ctx context.Context) (*sql.Conn, error) {
+	return x.DB.Conn(ctx)
+}
 
+func (x *impl) Do(ctx context.Context, fn func() error) error {
+	if fn == nil {
+		return errors.New("sql: empty callback func")
+	}
 	x.Init()
 	defer x.Done()
-	defer conn.Close()
-	return fn(conn)
+
+	return timeout.WithContext(ctx,
+		func() error {
+			<-time.After(time.Minute)
+			return context.DeadlineExceeded
+		},
+		func() error {
+			return fn()
+		},
+	)
 }
 
 func (x *impl) Stats() sql.DBStats {
